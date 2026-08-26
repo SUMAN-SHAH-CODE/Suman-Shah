@@ -143,7 +143,7 @@ When building dynamic visual portals, always ensure content sanitization and sec
     readTimeMinutes: 5,
     publishedAt: '2024-11-01T10:00:00Z',
     authorName: 'Portfolio Author',
-    authorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+    authorPhoto: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=1200&q=80',
     viewsCount: 1420,
     featured: true
   },
@@ -212,6 +212,54 @@ export class ContentService {
   constructor() {
     this.loadReadBlogIds();
     this.loadFromLocalStorage();
+    this.initFirestoreRealtimeListeners();
+  }
+
+  private initFirestoreRealtimeListeners(): void {
+    // Dynamic import to avoid unhandled async network background streams during unit test environments
+    import('../config/firebase.config').then(({ getFirebaseFirestore }) => {
+      import('firebase/firestore').then(({ collection, onSnapshot }) => {
+        try {
+          const db = getFirebaseFirestore();
+
+          onSnapshot(collection(db, 'blogs'), snapshot => {
+            if (!snapshot.empty) {
+              const list: Blog[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Blog));
+              this.blogsSubject.next(list);
+            }
+          }, () => {});
+
+          onSnapshot(collection(db, 'projects'), snapshot => {
+            if (!snapshot.empty) {
+              const list: Project[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Project));
+              this.projectsSubject.next(list);
+            }
+          }, () => {});
+
+          onSnapshot(collection(db, 'achievements'), snapshot => {
+            if (!snapshot.empty) {
+              const list: Achievement[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Achievement));
+              this.achievementsSubject.next(list);
+            }
+          }, () => {});
+
+          onSnapshot(collection(db, 'certificates'), snapshot => {
+            if (!snapshot.empty) {
+              const list: Certificate[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Certificate));
+              this.certificatesSubject.next(list);
+            }
+          }, () => {});
+
+          onSnapshot(collection(db, 'skills'), snapshot => {
+            if (!snapshot.empty) {
+              const list: Skill[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Skill));
+              this.skillsSubject.next(list);
+            }
+          }, () => {});
+
+        } catch (e) {}
+      }).catch(() => {});
+    }).catch(() => {});
   }
 
   private loadReadBlogIds(): void {
@@ -275,10 +323,11 @@ export class ContentService {
       this.readBlogIdsSubject.next(currentSet);
       this.saveReadBlogIds(currentSet);
 
-      // increment view count
       const updated = this.blogsSubject.value.map(blog => {
         if (blog.id === id) {
-          return { ...blog, viewsCount: (blog.viewsCount || 0) + 1 };
+          const newViews = (blog.viewsCount || 0) + 1;
+          this.syncFirestoreDoc('blogs', id, { viewsCount: newViews });
+          return { ...blog, viewsCount: newViews };
         }
         return blog;
       });
@@ -292,15 +341,16 @@ export class ContentService {
   }
 
   addBlog(blog: Omit<Blog, 'id'>): Blog {
-    const newBlog: Blog = {
-      ...blog,
-      id: 'blog-' + Date.now(),
-      viewsCount: 0,
-      slug: blog.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'blog-' + Date.now()
-    };
+    const slug = blog.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'blog-' + Date.now();
+    const newId = 'blog-' + Date.now();
+    const newBlog: Blog = { ...blog, slug, viewsCount: 0, id: newId };
+
     const updated = [newBlog, ...this.blogsSubject.value];
     this.blogsSubject.next(updated);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('blogs', newId, { ...blog, slug, viewsCount: 0 });
+
     return newBlog;
   }
 
@@ -310,19 +360,28 @@ export class ContentService {
     );
     this.blogsSubject.next(updated);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('blogs', id, updatedData);
   }
 
   deleteBlog(id: string): void {
     const updated = this.blogsSubject.value.filter(b => b.id !== id);
     this.blogsSubject.next(updated);
     this.saveStateToLocalStorage();
+
+    this.deleteFirestoreDoc('blogs', id);
   }
 
   // --- PROJECT METHODS ---
   addProject(project: Omit<Project, 'id'>): Project {
-    const newProject: Project = { ...project, id: 'proj-' + Date.now() };
+    const newId = 'proj-' + Date.now();
+    const newProject: Project = { ...project, id: newId };
+
     this.projectsSubject.next([newProject, ...this.projectsSubject.value]);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('projects', newId, project);
+
     return newProject;
   }
 
@@ -330,18 +389,27 @@ export class ContentService {
     const updated = this.projectsSubject.value.map(p => p.id === id ? { ...p, ...data } : p);
     this.projectsSubject.next(updated);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('projects', id, data);
   }
 
   deleteProject(id: string): void {
     this.projectsSubject.next(this.projectsSubject.value.filter(p => p.id !== id));
     this.saveStateToLocalStorage();
+
+    this.deleteFirestoreDoc('projects', id);
   }
 
   // --- ACHIEVEMENT METHODS ---
   addAchievement(ach: Omit<Achievement, 'id'>): Achievement {
-    const newAch: Achievement = { ...ach, id: 'ach-' + Date.now() };
+    const newId = 'ach-' + Date.now();
+    const newAch: Achievement = { ...ach, id: newId };
+
     this.achievementsSubject.next([newAch, ...this.achievementsSubject.value]);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('achievements', newId, ach);
+
     return newAch;
   }
 
@@ -349,18 +417,27 @@ export class ContentService {
     const updated = this.achievementsSubject.value.map(a => a.id === id ? { ...a, ...data } : a);
     this.achievementsSubject.next(updated);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('achievements', id, data);
   }
 
   deleteAchievement(id: string): void {
     this.achievementsSubject.next(this.achievementsSubject.value.filter(a => a.id !== id));
     this.saveStateToLocalStorage();
+
+    this.deleteFirestoreDoc('achievements', id);
   }
 
   // --- CERTIFICATE METHODS ---
   addCertificate(cert: Omit<Certificate, 'id'>): Certificate {
-    const newCert: Certificate = { ...cert, id: 'cert-' + Date.now() };
+    const newId = 'cert-' + Date.now();
+    const newCert: Certificate = { ...cert, id: newId };
+
     this.certificatesSubject.next([newCert, ...this.certificatesSubject.value]);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('certificates', newId, cert);
+
     return newCert;
   }
 
@@ -368,18 +445,27 @@ export class ContentService {
     const updated = this.certificatesSubject.value.map(c => c.id === id ? { ...c, ...data } : c);
     this.certificatesSubject.next(updated);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('certificates', id, data);
   }
 
   deleteCertificate(id: string): void {
     this.certificatesSubject.next(this.certificatesSubject.value.filter(c => c.id !== id));
     this.saveStateToLocalStorage();
+
+    this.deleteFirestoreDoc('certificates', id);
   }
 
   // --- SKILL METHODS ---
   addSkill(skill: Omit<Skill, 'id'>): Skill {
-    const newSkill: Skill = { ...skill, id: 'sk-' + Date.now() };
+    const newId = 'sk-' + Date.now();
+    const newSkill: Skill = { ...skill, id: newId };
+
     this.skillsSubject.next([...this.skillsSubject.value, newSkill]);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('skills', newId, skill);
+
     return newSkill;
   }
 
@@ -387,11 +473,37 @@ export class ContentService {
     const updated = this.skillsSubject.value.map(s => s.id === id ? { ...s, ...data } : s);
     this.skillsSubject.next(updated);
     this.saveStateToLocalStorage();
+
+    this.syncFirestoreDoc('skills', id, data);
   }
 
   deleteSkill(id: string): void {
     this.skillsSubject.next(this.skillsSubject.value.filter(s => s.id !== id));
     this.saveStateToLocalStorage();
+
+    this.deleteFirestoreDoc('skills', id);
+  }
+
+  private syncFirestoreDoc(coll: string, docId: string, data: any): void {
+    import('../config/firebase.config').then(({ getFirebaseFirestore }) => {
+      import('firebase/firestore').then(({ doc, setDoc }) => {
+        try {
+          const db = getFirebaseFirestore();
+          setDoc(doc(db, coll, docId), data, { merge: true }).catch(() => {});
+        } catch (e) {}
+      }).catch(() => {});
+    }).catch(() => {});
+  }
+
+  private deleteFirestoreDoc(coll: string, docId: string): void {
+    import('../config/firebase.config').then(({ getFirebaseFirestore }) => {
+      import('firebase/firestore').then(({ doc, deleteDoc }) => {
+        try {
+          const db = getFirebaseFirestore();
+          deleteDoc(doc(db, coll, docId)).catch(() => {});
+        } catch (e) {}
+      }).catch(() => {});
+    }).catch(() => {});
   }
 
   // --- STATS ---
