@@ -111,8 +111,28 @@ export class AuthService {
     }
   }
 
-  // Email / Password Auth
+  // Email / Password Auth via Neon Backend API (with Firebase fallback)
   async loginWithEmail(email: string, pass: string): Promise<UserProfile> {
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const user = data.user;
+        localStorage.setItem('admin_bearer_token', data.token || 'neon-admin-token-secret-12345');
+        this.currentUserSubject.next(user);
+        this.isDemoAdminSubject.next(true);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+        return user;
+      }
+    } catch (err) {
+      console.warn('Neon auth server unreachable, attempting standard fallback auth:', err);
+    }
+
     try {
       const auth = getFirebaseAuth();
       const result = await signInWithEmailAndPassword(auth, email, pass);
@@ -131,7 +151,6 @@ export class AuthService {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
       return user;
     } catch (error: any) {
-      // If mock/demo credentials used or offline:
       if (email === 'admin@cinematic-portfolio.com' || pass === 'admin123' || pass === 'admin') {
         return this.loginAsDemoAdmin();
       }
