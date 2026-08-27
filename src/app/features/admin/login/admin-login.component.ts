@@ -66,9 +66,6 @@ import { AuthService } from '../../../core/services/auth.service';
             <button type="submit" [disabled]="loading" class="btn-cinematic btn-block">
               {{ loading ? 'Authenticating...' : 'Sign In as Admin' }}
             </button>
-            <button type="button" (click)="quickDemoLogin()" class="btn-cinematic btn-outline btn-block" style="margin-top: 0.5rem;">
-              ⚡ One-Click Demo Admin Login
-            </button>
           </div>
         </form>
       </div>
@@ -217,8 +214,8 @@ export class AdminLoginComponent {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
-  email = 'admin@cinematic-portfolio.com';
-  password = 'admin';
+  email = '';
+  password = '';
   loading = false;
   errorMessage = '';
 
@@ -251,11 +248,6 @@ export class AdminLoginComponent {
     } finally {
       this.loading = false;
     }
-  }
-
-  quickDemoLogin(): void {
-    this.authService.loginAsDemoAdmin();
-    this.redirectAfterLogin();
   }
 
   private redirectAfterLogin(): void {

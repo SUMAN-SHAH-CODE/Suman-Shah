@@ -1,14 +1,17 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { Blog, Achievement, Project, Certificate, Skill, PortfolioStats } from '../models/portfolio.model';
+import { AuthService } from './auth.service';
 
+const API_BASE_URL = 'http://localhost:3000/api';
 const READ_BLOGS_KEY = 'cinematic_portfolio_read_blogs';
 
 const INITIAL_SKILLS: Skill[] = [
   { id: 'sk-1', name: 'Angular 18 & RxJS', category: 'Frontend', proficiency: 95, featured: true, icon: 'code' },
   { id: 'sk-2', name: 'TypeScript & JavaScript', category: 'Frontend', proficiency: 92, featured: true, icon: 'terminal' },
   { id: 'sk-3', name: 'SCSS & Modern CSS3', category: 'Frontend', proficiency: 90, featured: true, icon: 'palette' },
-  { id: 'sk-4', name: 'Firebase & Firestore', category: 'Backend', proficiency: 88, featured: true, icon: 'flame' },
+  { id: 'sk-4', name: 'Firebase & Neon Postgres', category: 'Backend', proficiency: 88, featured: true, icon: 'flame' },
   { id: 'sk-5', name: 'Node.js & Express', category: 'Backend', proficiency: 85, featured: true, icon: 'server' },
   { id: 'sk-6', name: 'REST & GraphQL APIs', category: 'Backend', proficiency: 86, featured: false, icon: 'api' },
   { id: 'sk-7', name: 'Git & GitHub Actions', category: 'Cloud/DevOps', proficiency: 89, featured: false, icon: 'git-branch' },
@@ -33,7 +36,7 @@ const INITIAL_PROJECTS: Project[] = [
     title: 'PulseFlow - Realtime Analytics Dashboard',
     tagline: 'High-frequency telemetry stream visualizer with custom reactive charts',
     description: 'Ultra-fast dashboard capable of rendering 100k data points per second with zero frame drops, leveraging Web Workers and RxJS pipeline optimization.',
-    technologies: ['Angular', 'RxJS', 'Firebase Firestore', 'Chart.js', 'Tailwind'],
+    technologies: ['Angular', 'RxJS', 'Neon Postgres', 'Chart.js', 'Tailwind'],
     imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=800&q=80',
     demoUrl: 'https://example.com/demo/pulseflow',
     githubUrl: 'https://github.com/example/pulseflow',
@@ -96,7 +99,7 @@ const INITIAL_CERTIFICATES: Certificate[] = [
     expiryDate: '2026-02-10',
     credentialId: 'GCP-DEV-9920184',
     credentialUrl: 'https://example.com/credentials/gcp-dev',
-    skillsCovered: ['Cloud Architecture', 'Serverless Functions', 'Firestore DB', 'Security']
+    skillsCovered: ['Cloud Architecture', 'Serverless Functions', 'Neon DB', 'Security']
   },
   {
     id: 'cert-2',
@@ -191,6 +194,9 @@ service cloud.firestore {
   providedIn: 'root'
 })
 export class ContentService {
+  private http = inject(HttpClient);
+  private authService = inject(AuthService);
+
   private blogsSubject = new BehaviorSubject<Blog[]>(INITIAL_BLOGS);
   public blogs$: Observable<Blog[]> = this.blogsSubject.asObservable();
 
@@ -212,54 +218,52 @@ export class ContentService {
   constructor() {
     this.loadReadBlogIds();
     this.loadFromLocalStorage();
-    this.initFirestoreRealtimeListeners();
+    this.fetchDataFromNeonApi();
   }
 
-  private initFirestoreRealtimeListeners(): void {
-    // Dynamic import to avoid unhandled async network background streams during unit test environments
-    import('../config/firebase.config').then(({ getFirebaseFirestore }) => {
-      import('firebase/firestore').then(({ collection, onSnapshot }) => {
-        try {
-          const db = getFirebaseFirestore();
+  private getAuthHeaders(): HttpHeaders {
+    const user = this.authService.currentUserValue;
+    const token = user?.uid || 'admin-token-session-valid';
+    return new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    });
+  }
 
-          onSnapshot(collection(db, 'blogs'), snapshot => {
-            if (!snapshot.empty) {
-              const list: Blog[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Blog));
-              this.blogsSubject.next(list);
-            }
-          }, () => {});
+  private fetchDataFromNeonApi(): void {
+    this.http.get<Blog[]>(`${API_BASE_URL}/blogs`).subscribe({
+      next: (blogs) => {
+        if (blogs && blogs.length > 0) this.blogsSubject.next(blogs);
+      },
+      error: () => {}
+    });
 
-          onSnapshot(collection(db, 'projects'), snapshot => {
-            if (!snapshot.empty) {
-              const list: Project[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Project));
-              this.projectsSubject.next(list);
-            }
-          }, () => {});
+    this.http.get<Project[]>(`${API_BASE_URL}/projects`).subscribe({
+      next: (projects) => {
+        if (projects && projects.length > 0) this.projectsSubject.next(projects);
+      },
+      error: () => {}
+    });
 
-          onSnapshot(collection(db, 'achievements'), snapshot => {
-            if (!snapshot.empty) {
-              const list: Achievement[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Achievement));
-              this.achievementsSubject.next(list);
-            }
-          }, () => {});
+    this.http.get<Achievement[]>(`${API_BASE_URL}/achievements`).subscribe({
+      next: (items) => {
+        if (items && items.length > 0) this.achievementsSubject.next(items);
+      },
+      error: () => {}
+    });
 
-          onSnapshot(collection(db, 'certificates'), snapshot => {
-            if (!snapshot.empty) {
-              const list: Certificate[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Certificate));
-              this.certificatesSubject.next(list);
-            }
-          }, () => {});
+    this.http.get<Certificate[]>(`${API_BASE_URL}/certificates`).subscribe({
+      next: (items) => {
+        if (items && items.length > 0) this.certificatesSubject.next(items);
+      },
+      error: () => {}
+    });
 
-          onSnapshot(collection(db, 'skills'), snapshot => {
-            if (!snapshot.empty) {
-              const list: Skill[] = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as Skill));
-              this.skillsSubject.next(list);
-            }
-          }, () => {});
-
-        } catch (e) {}
-      }).catch(() => {});
-    }).catch(() => {});
+    this.http.get<Skill[]>(`${API_BASE_URL}/skills`).subscribe({
+      next: (items) => {
+        if (items && items.length > 0) this.skillsSubject.next(items);
+      },
+      error: () => {}
+    });
   }
 
   private loadReadBlogIds(): void {
@@ -326,7 +330,7 @@ export class ContentService {
       const updated = this.blogsSubject.value.map(blog => {
         if (blog.id === id) {
           const newViews = (blog.viewsCount || 0) + 1;
-          this.syncFirestoreDoc('blogs', id, { viewsCount: newViews });
+          this.http.put(`${API_BASE_URL}/blogs/${id}`, { viewsCount: newViews }).subscribe({ error: () => {} });
           return { ...blog, viewsCount: newViews };
         }
         return blog;
@@ -349,7 +353,7 @@ export class ContentService {
     this.blogsSubject.next(updated);
     this.saveStateToLocalStorage();
 
-    this.syncFirestoreDoc('blogs', newId, { ...blog, slug, viewsCount: 0 });
+    this.http.post<Blog>(`${API_BASE_URL}/blogs`, blog, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
 
     return newBlog;
   }
@@ -361,7 +365,7 @@ export class ContentService {
     this.blogsSubject.next(updated);
     this.saveStateToLocalStorage();
 
-    this.syncFirestoreDoc('blogs', id, updatedData);
+    this.http.put(`${API_BASE_URL}/blogs/${id}`, updatedData, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
   }
 
   deleteBlog(id: string): void {
@@ -369,7 +373,7 @@ export class ContentService {
     this.blogsSubject.next(updated);
     this.saveStateToLocalStorage();
 
-    this.deleteFirestoreDoc('blogs', id);
+    this.http.delete(`${API_BASE_URL}/blogs/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
   }
 
   // --- PROJECT METHODS ---
@@ -380,7 +384,7 @@ export class ContentService {
     this.projectsSubject.next([newProject, ...this.projectsSubject.value]);
     this.saveStateToLocalStorage();
 
-    this.syncFirestoreDoc('projects', newId, project);
+    this.http.post<Project>(`${API_BASE_URL}/projects`, project, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
 
     return newProject;
   }
@@ -389,15 +393,13 @@ export class ContentService {
     const updated = this.projectsSubject.value.map(p => p.id === id ? { ...p, ...data } : p);
     this.projectsSubject.next(updated);
     this.saveStateToLocalStorage();
-
-    this.syncFirestoreDoc('projects', id, data);
   }
 
   deleteProject(id: string): void {
     this.projectsSubject.next(this.projectsSubject.value.filter(p => p.id !== id));
     this.saveStateToLocalStorage();
 
-    this.deleteFirestoreDoc('projects', id);
+    this.http.delete(`${API_BASE_URL}/projects/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
   }
 
   // --- ACHIEVEMENT METHODS ---
@@ -408,7 +410,7 @@ export class ContentService {
     this.achievementsSubject.next([newAch, ...this.achievementsSubject.value]);
     this.saveStateToLocalStorage();
 
-    this.syncFirestoreDoc('achievements', newId, ach);
+    this.http.post<Achievement>(`${API_BASE_URL}/achievements`, ach, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
 
     return newAch;
   }
@@ -417,15 +419,13 @@ export class ContentService {
     const updated = this.achievementsSubject.value.map(a => a.id === id ? { ...a, ...data } : a);
     this.achievementsSubject.next(updated);
     this.saveStateToLocalStorage();
-
-    this.syncFirestoreDoc('achievements', id, data);
   }
 
   deleteAchievement(id: string): void {
     this.achievementsSubject.next(this.achievementsSubject.value.filter(a => a.id !== id));
     this.saveStateToLocalStorage();
 
-    this.deleteFirestoreDoc('achievements', id);
+    this.http.delete(`${API_BASE_URL}/achievements/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
   }
 
   // --- CERTIFICATE METHODS ---
@@ -436,7 +436,7 @@ export class ContentService {
     this.certificatesSubject.next([newCert, ...this.certificatesSubject.value]);
     this.saveStateToLocalStorage();
 
-    this.syncFirestoreDoc('certificates', newId, cert);
+    this.http.post<Certificate>(`${API_BASE_URL}/certificates`, cert, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
 
     return newCert;
   }
@@ -445,15 +445,13 @@ export class ContentService {
     const updated = this.certificatesSubject.value.map(c => c.id === id ? { ...c, ...data } : c);
     this.certificatesSubject.next(updated);
     this.saveStateToLocalStorage();
-
-    this.syncFirestoreDoc('certificates', id, data);
   }
 
   deleteCertificate(id: string): void {
     this.certificatesSubject.next(this.certificatesSubject.value.filter(c => c.id !== id));
     this.saveStateToLocalStorage();
 
-    this.deleteFirestoreDoc('certificates', id);
+    this.http.delete(`${API_BASE_URL}/certificates/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
   }
 
   // --- SKILL METHODS ---
@@ -464,7 +462,7 @@ export class ContentService {
     this.skillsSubject.next([...this.skillsSubject.value, newSkill]);
     this.saveStateToLocalStorage();
 
-    this.syncFirestoreDoc('skills', newId, skill);
+    this.http.post<Skill>(`${API_BASE_URL}/skills`, skill, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
 
     return newSkill;
   }
@@ -473,37 +471,13 @@ export class ContentService {
     const updated = this.skillsSubject.value.map(s => s.id === id ? { ...s, ...data } : s);
     this.skillsSubject.next(updated);
     this.saveStateToLocalStorage();
-
-    this.syncFirestoreDoc('skills', id, data);
   }
 
   deleteSkill(id: string): void {
     this.skillsSubject.next(this.skillsSubject.value.filter(s => s.id !== id));
     this.saveStateToLocalStorage();
 
-    this.deleteFirestoreDoc('skills', id);
-  }
-
-  private syncFirestoreDoc(coll: string, docId: string, data: any): void {
-    import('../config/firebase.config').then(({ getFirebaseFirestore }) => {
-      import('firebase/firestore').then(({ doc, setDoc }) => {
-        try {
-          const db = getFirebaseFirestore();
-          setDoc(doc(db, coll, docId), data, { merge: true }).catch(() => {});
-        } catch (e) {}
-      }).catch(() => {});
-    }).catch(() => {});
-  }
-
-  private deleteFirestoreDoc(coll: string, docId: string): void {
-    import('../config/firebase.config').then(({ getFirebaseFirestore }) => {
-      import('firebase/firestore').then(({ doc, deleteDoc }) => {
-        try {
-          const db = getFirebaseFirestore();
-          deleteDoc(doc(db, coll, docId)).catch(() => {});
-        } catch (e) {}
-      }).catch(() => {});
-    }).catch(() => {});
+    this.http.delete(`${API_BASE_URL}/skills/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
   }
 
   // --- STATS ---
