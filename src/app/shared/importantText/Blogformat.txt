@@ -1,0 +1,30 @@
+# Walkthrough: Blog Markdown Formatting, Spacing & Image Support
+
+## Problems Solved
+
+1. **Text & Whitespace Collapsing ("no space", single continuous line)**:
+   - Previously, markdown headings without spaces (like `###When building...`), JSON objects `{ ... }`, ASCII flowcharts (`↓`, `→`), numbered lists, and single line breaks `\n` were collapsed into flat unstructured text.
+   - We implemented a comprehensive Markdown and code parser in **[BlogDetailComponent](file:///d:/Local%20C%20Program%20Files/2025AngularByZoaib/MyProfile/Suman-Shah/src/app/features/blogs/blog-detail.component.ts)** and **[AdminDashboardComponent](file:///d:/Local%20C%20Program%20Files/2025AngularByZoaib/MyProfile/Suman-Shah/src/app/features/admin/dashboard/admin-dashboard.component.ts)**.
+
+2. **Image Not Seen**:
+   - The image upload endpoint in `server/index.js` now returns the full host URL (`http://localhost:3000/uploads/...`) and handles relative `/uploads/` paths seamlessly.
+   - Added `onError` fallback handling for cover images and embedded content images (`![alt](url)`).
+
+3. **Admin Live Preview**:
+   - Added a tabbed switch between **✏️ Edit Content** and **👁 Live Preview** inside the Blog creation/editing modal so the admin can verify formatting, line breaks, code cards, and cover images in real time before publishing.
+
+---
+
+## Formatter Capabilities
+
+- **Headings**: `#`, `##`, `###`, `####`, `#####`, `######` (works with or without a space, e.g. `###ProblemDetails` and `### ProblemDetails`).
+- **Code & JSON Blocks**: Multi-line `{ ... }` or ` ```json ... ``` ` rendered in syntax-highlighted monospace cards.
+- **ASCII Diagrams & Flowcharts**: Preserves vertical and horizontal alignment for flow diagrams with arrows (`↓`, `→`, etc.).
+- **Lists**: Formats numbered lists `1. type`, `2. title`, etc., and bullet points with high-visibility badges.
+- **Line Breaks & Spacing**: Single newlines `\n` become `<br/>` and double newlines `\n\n` create distinct `<p class="blog-p">` paragraphs.
+- **Inline Code & Links**: `` `code` `` rendered with glowing code chips, and URLs turned into clickable links.
+
+---
+
+## Verification
+- Run `ng build`: Successfully compiled with 0 errors.

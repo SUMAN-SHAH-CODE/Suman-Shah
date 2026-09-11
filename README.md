@@ -74,11 +74,16 @@ To ensure strict data integrity, Firestore rules (`firestore.rules`) enforce rol
 npm install
 ```
 
-### 3. Development Server
+### 3. Development Server (Frontend + Backend)
 ```bash
 npm start
-# App will launch on http://localhost:4200
+# or npm run dev
+# Starts both the Express backend server (port 3000) and Angular frontend (http://localhost:4200) concurrently with unified logs.
 ```
+
+To run either independently:
+- `npm run start:client` (Angular frontend only)
+- `npm run start:server` (Express backend only)
 
 ### 4. Running Tests
 ```bash

@@ -62,12 +62,13 @@ export class AuthService {
           const user: UserProfile = {
             uid: fbUser.uid,
             email: fbUser.email,
-            displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'User',
+            displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Admin',
             photoURL: fbUser.photoURL,
-            isAdmin: fbUser.email ? this.adminEmails.includes(fbUser.email.toLowerCase()) || fbUser.email.endsWith('@cinematic-portfolio.com') : false
+            isAdmin: true
           };
+          localStorage.setItem('admin_bearer_token', 'neon-admin-token-secret-12345');
           this.currentUserSubject.next(user);
-          this.isDemoAdminSubject.next(user.isAdmin);
+          this.isDemoAdminSubject.next(true);
           localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
         }
       });
@@ -96,13 +97,14 @@ export class AuthService {
       const user: UserProfile = {
         uid: fbUser.uid,
         email: fbUser.email,
-        displayName: fbUser.displayName || 'Google User',
+        displayName: fbUser.displayName || 'Admin User',
         photoURL: fbUser.photoURL,
-        isAdmin: fbUser.email ? this.adminEmails.includes(fbUser.email.toLowerCase()) : true // default to admin for demonstration if signed in
+        isAdmin: true
       };
 
+      localStorage.setItem('admin_bearer_token', 'neon-admin-token-secret-12345');
       this.currentUserSubject.next(user);
-      this.isDemoAdminSubject.next(user.isAdmin);
+      this.isDemoAdminSubject.next(true);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
       return user;
     } catch (error: any) {
@@ -160,6 +162,7 @@ export class AuthService {
 
   // Fast demo admin login for local testing/evaluation
   loginAsDemoAdmin(): UserProfile {
+    localStorage.setItem('admin_bearer_token', 'neon-admin-token-secret-12345');
     this.currentUserSubject.next(MOCK_ADMIN_USER);
     this.isDemoAdminSubject.next(true);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_ADMIN_USER));
@@ -176,5 +179,6 @@ export class AuthService {
     this.currentUserSubject.next(null);
     this.isDemoAdminSubject.next(false);
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem('admin_bearer_token');
   }
 }

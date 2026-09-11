@@ -61,9 +61,27 @@ export interface Certificate {
 export interface Skill {
   id: string;
   name: string;
-  category: 'Frontend' | 'Backend' | 'Database' | 'Cloud/DevOps' | 'Tools' | string;
+  category:
+    | 'Frontend'
+    | 'Backend'
+    | 'Database'
+    | 'Cloud/DevOps'
+    | 'Tools'
+    | string;
   proficiency: number; // 0 - 100
   icon?: string;
+  featured?: boolean;
+}
+
+export interface Experience {
+  id: string;
+  startDate: string;
+  endDate: string;
+  jobTitle: string;
+  organization: string;
+  location?: string;
+  responsibilities: string[];
+  technologies?: string[];
   featured?: boolean;
 }
 
@@ -73,4 +91,16 @@ export interface PortfolioStats {
   achievementsCount: number;
   certificatesCount: number;
   skillsCount: number;
+  experiencesCount?: number;
+  messagesCount?: number;
+}
+
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  contact?: string;
+  message: string;
+  createdAt: string;
+  read?: boolean;
 }

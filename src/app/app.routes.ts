@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { HomeComponent } from './features/home/home.component';
 import { ProjectsComponent } from './features/projects/projects.component';
+import { ExperiencesComponent } from './features/experiences/experiences.component';
 import { AchievementsComponent } from './features/achievements/achievements.component';
 import { CertificatesComponent } from './features/certificates/certificates.component';
 import { BlogListComponent } from './features/blogs/blog-list.component';
@@ -12,6 +13,7 @@ import { adminGuard } from './core/guards/admin.guard';
 export const routes: Routes = [
   { path: '', component: HomeComponent },
   { path: 'projects', component: ProjectsComponent },
+  { path: 'experiences', component: ExperiencesComponent },
   { path: 'achievements', component: AchievementsComponent },
   { path: 'certificates', component: CertificatesComponent },
   { path: 'blogs', component: BlogListComponent },

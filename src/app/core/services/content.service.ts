@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
-import { Blog, Achievement, Project, Certificate, Skill, PortfolioStats } from '../models/portfolio.model';
+import { BehaviorSubject, Observable, of } from 'rxjs';
+import { Blog, Achievement, Project, Certificate, Skill, PortfolioStats, Experience, ContactMessage } from '../models/portfolio.model';
 import { AuthService } from './auth.service';
 
 const API_BASE_URL = 'http://localhost:3000/api';
@@ -212,12 +212,33 @@ export class ContentService {
   private skillsSubject = new BehaviorSubject<Skill[]>(INITIAL_SKILLS);
   public skills$: Observable<Skill[]> = this.skillsSubject.asObservable();
 
+  private experiencesSubject = new BehaviorSubject<Experience[]>([]);
+  public experiences$: Observable<Experience[]> = this.experiencesSubject.asObservable();
+
+  private messagesSubject = new BehaviorSubject<ContactMessage[]>([]);
+  public messages$: Observable<ContactMessage[]> = this.messagesSubject.asObservable();
+
+  public stats$: Observable<PortfolioStats> = new Observable(observer => {
+    const emit = () => observer.next(this.getStats());
+    emit();
+    this.blogsSubject.subscribe(emit);
+    this.projectsSubject.subscribe(emit);
+    this.achievementsSubject.subscribe(emit);
+    this.certificatesSubject.subscribe(emit);
+    this.skillsSubject.subscribe(emit);
+    this.experiencesSubject.subscribe(emit);
+  });
+
   private readBlogIdsSubject = new BehaviorSubject<Set<string>>(new Set<string>());
   public readBlogIds$: Observable<Set<string>> = this.readBlogIdsSubject.asObservable();
 
   constructor() {
     this.loadReadBlogIds();
     this.loadFromLocalStorage();
+    this.fetchDataFromNeonApi();
+  }
+
+  fetchAllFromApi(): void {
     this.fetchDataFromNeonApi();
   }
 
@@ -231,37 +252,31 @@ export class ContentService {
 
   private fetchDataFromNeonApi(): void {
     this.http.get<Blog[]>(`${API_BASE_URL}/blogs`).subscribe({
-      next: (blogs) => {
-        if (blogs && blogs.length > 0) this.blogsSubject.next(blogs);
-      },
+      next: (blogs) => { if (blogs && blogs.length > 0) this.blogsSubject.next(blogs); },
       error: () => {}
     });
-
     this.http.get<Project[]>(`${API_BASE_URL}/projects`).subscribe({
-      next: (projects) => {
-        if (projects && projects.length > 0) this.projectsSubject.next(projects);
-      },
+      next: (projects) => { if (projects && projects.length > 0) this.projectsSubject.next(projects); },
       error: () => {}
     });
-
     this.http.get<Achievement[]>(`${API_BASE_URL}/achievements`).subscribe({
-      next: (items) => {
-        if (items && items.length > 0) this.achievementsSubject.next(items);
-      },
+      next: (items) => { if (items && items.length > 0) this.achievementsSubject.next(items); },
       error: () => {}
     });
-
     this.http.get<Certificate[]>(`${API_BASE_URL}/certificates`).subscribe({
-      next: (items) => {
-        if (items && items.length > 0) this.certificatesSubject.next(items);
-      },
+      next: (items) => { if (items && items.length > 0) this.certificatesSubject.next(items); },
       error: () => {}
     });
-
     this.http.get<Skill[]>(`${API_BASE_URL}/skills`).subscribe({
-      next: (items) => {
-        if (items && items.length > 0) this.skillsSubject.next(items);
-      },
+      next: (items) => { if (items && items.length > 0) this.skillsSubject.next(items); },
+      error: () => {}
+    });
+    this.http.get<Experience[]>(`${API_BASE_URL}/experiences`).subscribe({
+      next: (items) => { if (items && items.length > 0) this.experiencesSubject.next(items); },
+      error: () => {}
+    });
+    this.http.get<ContactMessage[]>(`${API_BASE_URL}/contact_messages`, { headers: this.getAuthHeaders() }).subscribe({
+      next: (items) => { if (items) this.messagesSubject.next(items); },
       error: () => {}
     });
   }
@@ -312,13 +327,8 @@ export class ContentService {
   }
 
   // --- BLOG METHODS ---
-  getBlogs(): Blog[] {
-    return this.blogsSubject.value;
-  }
-
-  getBlogById(id: string): Blog | undefined {
-    return this.blogsSubject.value.find(b => b.id === id || b.slug === id);
-  }
+  getBlogs(): Blog[] { return this.blogsSubject.value; }
+  getBlogById(id: string): Blog | undefined { return this.blogsSubject.value.find(b => b.id === id || b.slug === id); }
 
   markBlogAsRead(id: string): void {
     const currentSet = new Set(this.readBlogIdsSubject.value);
@@ -326,7 +336,6 @@ export class ContentService {
       currentSet.add(id);
       this.readBlogIdsSubject.next(currentSet);
       this.saveReadBlogIds(currentSet);
-
       const updated = this.blogsSubject.value.map(blog => {
         if (blog.id === id) {
           const newViews = (blog.viewsCount || 0) + 1;
@@ -340,144 +349,135 @@ export class ContentService {
     }
   }
 
-  isBlogRead(id: string): boolean {
-    return this.readBlogIdsSubject.value.has(id);
-  }
+  isBlogRead(id: string): boolean { return this.readBlogIdsSubject.value.has(id); }
 
-  addBlog(blog: Omit<Blog, 'id'>): Blog {
+  addBlog(blog: Omit<Blog, 'id'>): Observable<Blog> {
     const slug = blog.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') || 'blog-' + Date.now();
     const newId = 'blog-' + Date.now();
     const newBlog: Blog = { ...blog, slug, viewsCount: 0, id: newId };
-
-    const updated = [newBlog, ...this.blogsSubject.value];
-    this.blogsSubject.next(updated);
+    this.blogsSubject.next([newBlog, ...this.blogsSubject.value]);
     this.saveStateToLocalStorage();
-
-    this.http.post<Blog>(`${API_BASE_URL}/blogs`, blog, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
-
-    return newBlog;
+    return this.http.post<Blog>(`${API_BASE_URL}/blogs`, blog, { headers: this.getAuthHeaders() });
   }
 
-  updateBlog(id: string, updatedData: Partial<Blog>): void {
-    const updated = this.blogsSubject.value.map(blog =>
-      blog.id === id ? { ...blog, ...updatedData } : blog
-    );
+  updateBlog(id: string, data: Partial<Blog>): Observable<any> {
+    const updated = this.blogsSubject.value.map(b => b.id === id ? { ...b, ...data } : b);
     this.blogsSubject.next(updated);
     this.saveStateToLocalStorage();
-
-    this.http.put(`${API_BASE_URL}/blogs/${id}`, updatedData, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
+    return this.http.put(`${API_BASE_URL}/blogs/${id}`, data, { headers: this.getAuthHeaders() });
   }
 
-  deleteBlog(id: string): void {
-    const updated = this.blogsSubject.value.filter(b => b.id !== id);
-    this.blogsSubject.next(updated);
+  deleteBlog(id: string): Observable<any> {
+    this.blogsSubject.next(this.blogsSubject.value.filter(b => b.id !== id));
     this.saveStateToLocalStorage();
-
-    this.http.delete(`${API_BASE_URL}/blogs/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
+    return this.http.delete(`${API_BASE_URL}/blogs/${id}`, { headers: this.getAuthHeaders() });
   }
 
   // --- PROJECT METHODS ---
-  addProject(project: Omit<Project, 'id'>): Project {
+  addProject(project: Omit<Project, 'id'>): Observable<Project> {
     const newId = 'proj-' + Date.now();
     const newProject: Project = { ...project, id: newId };
-
     this.projectsSubject.next([newProject, ...this.projectsSubject.value]);
     this.saveStateToLocalStorage();
-
-    this.http.post<Project>(`${API_BASE_URL}/projects`, project, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
-
-    return newProject;
+    return this.http.post<Project>(`${API_BASE_URL}/projects`, project, { headers: this.getAuthHeaders() });
   }
 
-  updateProject(id: string, data: Partial<Project>): void {
+  updateProject(id: string, data: Partial<Project>): Observable<any> {
     const updated = this.projectsSubject.value.map(p => p.id === id ? { ...p, ...data } : p);
     this.projectsSubject.next(updated);
     this.saveStateToLocalStorage();
+    return this.http.put(`${API_BASE_URL}/projects/${id}`, data, { headers: this.getAuthHeaders() });
   }
 
-  deleteProject(id: string): void {
+  deleteProject(id: string): Observable<any> {
     this.projectsSubject.next(this.projectsSubject.value.filter(p => p.id !== id));
     this.saveStateToLocalStorage();
-
-    this.http.delete(`${API_BASE_URL}/projects/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
+    return this.http.delete(`${API_BASE_URL}/projects/${id}`, { headers: this.getAuthHeaders() });
   }
 
   // --- ACHIEVEMENT METHODS ---
-  addAchievement(ach: Omit<Achievement, 'id'>): Achievement {
+  addAchievement(ach: Omit<Achievement, 'id'>): Observable<Achievement> {
     const newId = 'ach-' + Date.now();
     const newAch: Achievement = { ...ach, id: newId };
-
     this.achievementsSubject.next([newAch, ...this.achievementsSubject.value]);
     this.saveStateToLocalStorage();
-
-    this.http.post<Achievement>(`${API_BASE_URL}/achievements`, ach, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
-
-    return newAch;
+    return this.http.post<Achievement>(`${API_BASE_URL}/achievements`, ach, { headers: this.getAuthHeaders() });
   }
 
-  updateAchievement(id: string, data: Partial<Achievement>): void {
+  updateAchievement(id: string, data: Partial<Achievement>): Observable<any> {
     const updated = this.achievementsSubject.value.map(a => a.id === id ? { ...a, ...data } : a);
     this.achievementsSubject.next(updated);
     this.saveStateToLocalStorage();
+    return this.http.put(`${API_BASE_URL}/achievements/${id}`, data, { headers: this.getAuthHeaders() });
   }
 
-  deleteAchievement(id: string): void {
+  deleteAchievement(id: string): Observable<any> {
     this.achievementsSubject.next(this.achievementsSubject.value.filter(a => a.id !== id));
     this.saveStateToLocalStorage();
-
-    this.http.delete(`${API_BASE_URL}/achievements/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
+    return this.http.delete(`${API_BASE_URL}/achievements/${id}`, { headers: this.getAuthHeaders() });
   }
 
   // --- CERTIFICATE METHODS ---
-  addCertificate(cert: Omit<Certificate, 'id'>): Certificate {
+  addCertificate(cert: Omit<Certificate, 'id'>): Observable<Certificate> {
     const newId = 'cert-' + Date.now();
     const newCert: Certificate = { ...cert, id: newId };
-
     this.certificatesSubject.next([newCert, ...this.certificatesSubject.value]);
     this.saveStateToLocalStorage();
-
-    this.http.post<Certificate>(`${API_BASE_URL}/certificates`, cert, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
-
-    return newCert;
+    return this.http.post<Certificate>(`${API_BASE_URL}/certificates`, cert, { headers: this.getAuthHeaders() });
   }
 
-  updateCertificate(id: string, data: Partial<Certificate>): void {
+  updateCertificate(id: string, data: Partial<Certificate>): Observable<any> {
     const updated = this.certificatesSubject.value.map(c => c.id === id ? { ...c, ...data } : c);
     this.certificatesSubject.next(updated);
     this.saveStateToLocalStorage();
+    return this.http.put(`${API_BASE_URL}/certificates/${id}`, data, { headers: this.getAuthHeaders() });
   }
 
-  deleteCertificate(id: string): void {
+  deleteCertificate(id: string): Observable<any> {
     this.certificatesSubject.next(this.certificatesSubject.value.filter(c => c.id !== id));
     this.saveStateToLocalStorage();
-
-    this.http.delete(`${API_BASE_URL}/certificates/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
+    return this.http.delete(`${API_BASE_URL}/certificates/${id}`, { headers: this.getAuthHeaders() });
   }
 
   // --- SKILL METHODS ---
-  addSkill(skill: Omit<Skill, 'id'>): Skill {
+  addSkill(skill: Omit<Skill, 'id'>): Observable<Skill> {
     const newId = 'sk-' + Date.now();
     const newSkill: Skill = { ...skill, id: newId };
-
     this.skillsSubject.next([...this.skillsSubject.value, newSkill]);
     this.saveStateToLocalStorage();
-
-    this.http.post<Skill>(`${API_BASE_URL}/skills`, skill, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
-
-    return newSkill;
+    return this.http.post<Skill>(`${API_BASE_URL}/skills`, skill, { headers: this.getAuthHeaders() });
   }
 
-  updateSkill(id: string, data: Partial<Skill>): void {
+  updateSkill(id: string, data: Partial<Skill>): Observable<any> {
     const updated = this.skillsSubject.value.map(s => s.id === id ? { ...s, ...data } : s);
     this.skillsSubject.next(updated);
     this.saveStateToLocalStorage();
+    return this.http.put(`${API_BASE_URL}/skills/${id}`, data, { headers: this.getAuthHeaders() });
   }
 
-  deleteSkill(id: string): void {
+  deleteSkill(id: string): Observable<any> {
     this.skillsSubject.next(this.skillsSubject.value.filter(s => s.id !== id));
     this.saveStateToLocalStorage();
+    return this.http.delete(`${API_BASE_URL}/skills/${id}`, { headers: this.getAuthHeaders() });
+  }
 
-    this.http.delete(`${API_BASE_URL}/skills/${id}`, { headers: this.getAuthHeaders() }).subscribe({ error: () => {} });
+  // --- EXPERIENCE METHODS ---
+  addExperience(exp: Omit<Experience, 'id'>): Observable<Experience> {
+    const newId = 'exp-' + Date.now();
+    const newExp: Experience = { ...exp, id: newId };
+    this.experiencesSubject.next([newExp, ...this.experiencesSubject.value]);
+    return this.http.post<Experience>(`${API_BASE_URL}/experiences`, exp, { headers: this.getAuthHeaders() });
+  }
+
+  updateExperience(id: string, data: Partial<Experience>): Observable<any> {
+    const updated = this.experiencesSubject.value.map(e => e.id === id ? { ...e, ...data } : e);
+    this.experiencesSubject.next(updated);
+    return this.http.put(`${API_BASE_URL}/experiences/${id}`, data, { headers: this.getAuthHeaders() });
+  }
+
+  deleteExperience(id: string): Observable<any> {
+    this.experiencesSubject.next(this.experiencesSubject.value.filter(e => e.id !== id));
+    return this.http.delete(`${API_BASE_URL}/experiences/${id}`, { headers: this.getAuthHeaders() });
   }
 
   // --- STATS ---
@@ -487,7 +487,47 @@ export class ContentService {
       blogsCount: this.blogsSubject.value.length,
       achievementsCount: this.achievementsSubject.value.length,
       certificatesCount: this.certificatesSubject.value.length,
-      skillsCount: this.skillsSubject.value.length
+      skillsCount: this.skillsSubject.value.length,
+      experiencesCount: this.experiencesSubject.value.length,
+      messagesCount: this.messagesSubject.value.length
     };
   }
+
+  // --- IMAGE UPLOAD ---
+  uploadImage(file: File): Observable<{ url: string; relativeUrl: string; fullUrl: string; filename: string }> {
+    return new Observable(observer => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        this.http.post<{ url: string; relativeUrl: string; fullUrl: string; filename: string }>(
+          `${API_BASE_URL}/upload`,
+          { image: dataUrl, filename: file.name },
+          { headers: this.getAuthHeaders() }
+        ).subscribe({
+          next: (res) => { observer.next(res); observer.complete(); },
+          error: (err) => observer.error(err)
+        });
+      };
+      reader.onerror = (err) => observer.error(err);
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // --- CONTACT MESSAGES ---
+  sendContactMessage(msg: Omit<ContactMessage, 'id' | 'createdAt'>): Observable<any> {
+    return this.http.post(`${API_BASE_URL}/contact_messages`, msg);
+  }
+
+  getContactMessages(): Observable<ContactMessage[]> {
+    return this.http.get<ContactMessage[]>(`${API_BASE_URL}/contact_messages`, { headers: this.getAuthHeaders() });
+  }
+
+  markMessageRead(id: string, readState: boolean = true): Observable<any> {
+    return this.http.patch(`${API_BASE_URL}/contact_messages/${id}/read`, { read: readState }, { headers: this.getAuthHeaders() });
+  }
+
+  deleteContactMessage(id: string): Observable<any> {
+    return this.http.delete(`${API_BASE_URL}/contact_messages/${id}`, { headers: this.getAuthHeaders() });
+  }
 }
+

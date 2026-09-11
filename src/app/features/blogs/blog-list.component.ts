@@ -11,14 +11,14 @@ import { Observable } from 'rxjs';
   standalone: true,
   imports: [CommonModule, RouterLink, FormsModule],
   template: `
-    <div class="container-custom page-wrapper">
+    <div class="container-custom page-wrapper animate-fade-in-up">
       <div class="page-header">
         <span class="badge-tag">THOUGHTS & ARTICLES</span>
-        <h1 class="page-title">Blog & Insights</h1>
+        <h1 class="page-title">Blog & <span class="gradient-text-animated">Insights</span></h1>
         <p class="page-desc">In-depth technical articles on Angular architecture, web performance, security, and cloud scalability.</p>
       </div>
 
-      <!-- Search & Tag Filter Bar -->
+      <!-- Search Bar -->
       <div class="filter-bar glass-panel">
         <div class="search-input-wrapper">
           <span class="search-icon">🔍</span>
@@ -33,7 +33,7 @@ import { Observable } from 'rxjs';
 
       <!-- Blogs Grid -->
       <div class="blogs-grid">
-        <div class="blog-card glass-panel" *ngFor="let blog of filteredBlogs">
+        <div class="blog-card glass-panel card-hover-fx" *ngFor="let blog of getFilteredBlogs(blogs$ | async)">
           <div class="blog-cover" *ngIf="blog.coverImage">
             <img [src]="blog.coverImage" [alt]="blog.title" loading="lazy" />
           </div>
@@ -78,43 +78,49 @@ import { Observable } from 'rxjs';
     </div>
   `,
   styles: [`
-    .page-wrapper { padding-top: 3rem; }
-    .page-header { text-align: center; margin-bottom: 2.5rem; }
-    .page-title { font-size: 2.8rem; margin: 0.5rem 0; }
-    .page-desc { color: var(--text-muted); max-width: 600px; margin: 0 auto; }
+    .page-wrapper { padding-top: 1.5rem; }
+    .page-header { text-align: center; margin-bottom: 1.5rem; }
+    .page-title { font-size: 2.2rem; margin: 0.3rem 0; }
+    .page-desc { color: var(--text-muted); max-width: 550px; margin: 0 auto; font-size: 0.95rem; }
 
     .filter-bar {
-      padding: 1rem 1.5rem;
-      margin-bottom: 2.5rem;
+      padding: 0.65rem 1.1rem;
+      margin-bottom: 1.5rem;
+      border-radius: 10px;
     }
 
     .search-input-wrapper {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: 0.6rem;
     }
 
     .search-input {
       width: 100%;
       background: transparent;
       border: none;
-      outline: none;
       color: #fff;
-      font-size: 1rem;
       font-family: var(--font-body);
+      font-size: 0.9rem;
+      outline: none;
 
       &::placeholder {
         color: var(--text-dim);
       }
     }
 
+    .search-icon {
+      font-size: 0.95rem;
+    }
+
     .blogs-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-      gap: 2rem;
+      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+      gap: 1.25rem;
 
-      @media (max-width: 400px) {
-        grid-template-columns: 1fr;
+      @media (max-width: 600px) {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.65rem;
       }
     }
 
@@ -122,11 +128,21 @@ import { Observable } from 'rxjs';
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      border-radius: 12px;
+
+      @media (max-width: 600px) {
+        padding: 0;
+      }
     }
 
     .blog-cover {
-      height: 200px;
+      height: 150px;
       overflow: hidden;
+
+      @media (max-width: 600px) {
+        height: 80px;
+      }
+
       img {
         width: 100%;
         height: 100%;
@@ -139,7 +155,7 @@ import { Observable } from 'rxjs';
     }
 
     .blog-content {
-      padding: 1.5rem;
+      padding: 1.15rem;
       display: flex;
       flex-direction: column;
       flex-grow: 1;
@@ -149,24 +165,24 @@ import { Observable } from 'rxjs';
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 0.5rem;
-      font-size: 0.8rem;
+      gap: 0.4rem;
+      font-size: 0.78rem;
       color: var(--text-dim);
-      margin-bottom: 0.6rem;
+      margin-bottom: 0.5rem;
     }
 
     .seen-badge {
       background: rgba(16, 185, 129, 0.2);
       color: var(--accent-emerald);
-      padding: 0.1rem 0.5rem;
+      padding: 0.1rem 0.4rem;
       border-radius: 4px;
       font-weight: 700;
-      font-size: 0.7rem;
+      font-size: 0.68rem;
     }
 
     .blog-title {
-      font-size: 1.3rem;
-      margin-bottom: 0.6rem;
+      font-size: 1.15rem;
+      margin-bottom: 0.5rem;
       line-height: 1.3;
 
       a {
@@ -182,24 +198,24 @@ import { Observable } from 'rxjs';
 
     .blog-summary {
       color: var(--text-muted);
-      font-size: 0.92rem;
-      margin-bottom: 1.25rem;
-      line-height: 1.6;
+      font-size: 0.88rem;
+      margin-bottom: 1rem;
+      line-height: 1.5;
       flex-grow: 1;
     }
 
     .blog-tags {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.4rem;
-      margin-bottom: 1.25rem;
+      gap: 0.35rem;
+      margin-bottom: 1rem;
     }
 
     .tag-chip {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       color: var(--accent-purple);
       background: rgba(168, 85, 247, 0.1);
-      padding: 0.2rem 0.5rem;
+      padding: 0.15rem 0.45rem;
       border-radius: 4px;
     }
 
@@ -207,19 +223,18 @@ import { Observable } from 'rxjs';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      padding-top: 1rem;
+      padding-top: 0.75rem;
       border-top: 1px solid var(--border-glass);
     }
 
     .read-btn {
+      color: var(--accent-cyan);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.82rem;
       display: flex;
       align-items: center;
-      gap: 0.4rem;
-      color: var(--accent-cyan);
-      font-weight: 600;
-      font-size: 0.9rem;
-      text-decoration: none;
+      gap: 0.25rem;
 
       &:hover {
         text-decoration: underline;
@@ -230,45 +245,44 @@ import { Observable } from 'rxjs';
       background: transparent;
       border: 1px solid var(--border-glass);
       color: var(--text-muted);
-      padding: 0.3rem 0.75rem;
+      padding: 0.2rem 0.55rem;
       border-radius: 6px;
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       cursor: pointer;
       transition: var(--transition-smooth);
 
       &:hover {
-        border-color: var(--accent-emerald);
-        color: var(--accent-emerald);
+        border-color: var(--accent-cyan);
+        color: #fff;
       }
 
       &.is-read {
         background: rgba(16, 185, 129, 0.15);
-        border-color: rgba(16, 185, 129, 0.4);
         color: var(--accent-emerald);
+        border-color: rgba(16, 185, 129, 0.3);
       }
     }
   `]
 })
 export class BlogListComponent {
   contentService = inject(ContentService);
+  blogs$: Observable<Blog[]> = this.contentService.blogs$;
   searchQuery: string = '';
 
-  get filteredBlogs(): Blog[] {
-    const blogs = this.contentService.getBlogs();
-    if (!this.searchQuery.trim()) {
-      return blogs;
-    }
-    const q = this.searchQuery.toLowerCase();
-    return blogs.filter(b =>
-      b.title.toLowerCase().includes(q) ||
-      b.summary.toLowerCase().includes(q) ||
-      b.tags.some(t => t.toLowerCase().includes(q))
+  getFilteredBlogs(blogs: Blog[] | null): Blog[] {
+    if (!blogs) return [];
+    if (!this.searchQuery.trim()) return blogs;
+
+    const query = this.searchQuery.toLowerCase();
+    return blogs.filter(blog =>
+      blog.title.toLowerCase().includes(query) ||
+      blog.summary.toLowerCase().includes(query) ||
+      blog.tags.some(t => t.toLowerCase().includes(query))
     );
   }
 
-  toggleReadStatus(id: string, event: Event): void {
-    event.preventDefault();
+  toggleReadStatus(blogId: string, event: Event): void {
     event.stopPropagation();
-    this.contentService.markBlogAsRead(id);
+    this.contentService.markBlogAsRead(blogId);
   }
 }
