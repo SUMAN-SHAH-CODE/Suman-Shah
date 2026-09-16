@@ -3,8 +3,9 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable, of } from 'rxjs';
 import { Blog, Achievement, Project, Certificate, Skill, PortfolioStats, Experience, ContactMessage } from '../models/portfolio.model';
 import { AuthService } from './auth.service';
+import { environment } from '../../../environments/environment';
 
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = environment.apiUrl;
 const READ_BLOGS_KEY = 'cinematic_portfolio_read_blogs';
 
 const INITIAL_SKILLS: Skill[] = [

@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { UserProfile } from '../models/portfolio.model';
+import { environment } from '../../../environments/environment';
 import {
   getFirebaseAuth
 } from '../config/firebase.config';
@@ -116,7 +117,7 @@ export class AuthService {
   // Email / Password Auth via Neon Backend API (with Firebase fallback)
   async loginWithEmail(email: string, pass: string): Promise<UserProfile> {
     try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
+      const response = await fetch(`${environment.apiUrl}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: pass })

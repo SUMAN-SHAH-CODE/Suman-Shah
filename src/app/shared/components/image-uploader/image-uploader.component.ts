@@ -2,6 +2,7 @@ import { Component, EventEmitter, inject, Input, OnChanges, Output, SimpleChange
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ContentService } from '../../../core/services/content.service';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-image-uploader',
@@ -361,7 +362,7 @@ export class ImageUploaderComponent implements OnChanges {
   get displayUrl(): string {
     if (!this.value) return '';
     if (this.value.startsWith('/uploads/')) {
-      return 'http://localhost:3000' + this.value;
+      return environment.serverUrl + this.value;
     }
     return this.value;
   }
