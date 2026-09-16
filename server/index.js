@@ -97,7 +97,8 @@ app.post('/api/upload', verifyAdminAuth, (req, res) => {
     fs.writeFileSync(filePath, buffer);
 
     const relativeUrl = `/uploads/${finalFilename}`;
-    const fullUrl = `http://localhost:${PORT}${relativeUrl}`;
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+    const fullUrl = `${baseUrl}${relativeUrl}`;
 
     return res.json({
       status: 'success',
@@ -777,14 +778,37 @@ const handleDeleteMessage = async (req, res) => {
 app.delete('/api/contact_messages/:id', verifyAdminAuth, handleDeleteMessage);
 app.delete('/api/contact/:id', verifyAdminAuth, handleDeleteMessage);
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', db: !!sql, timestamp: new Date().toISOString() });
+// Root & Health check endpoints
+app.get('/', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'Suman Shah Portfolio API (Neon PostgreSQL)',
+    dbConfigured: !!sql,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/api/health', async (req, res) => {
+  let dbStatus = 'unconfigured';
+  if (sql) {
+    try {
+      await sql`SELECT 1 as test`;
+      dbStatus = 'connected';
+    } catch (dbErr) {
+      dbStatus = 'error: ' + dbErr.message;
+    }
+  }
+  res.json({ status: 'ok', db: dbStatus, timestamp: new Date().toISOString() });
 });
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Neon Relational API Server running on port ${PORT} (0.0.0.0)`);
+    if (!sql) {
+      console.warn('⚠️ WARNING: DATABASE_URL is not set or invalid. Running in fallback mode.');
+    } else {
+      console.log('✅ Neon Database Client initialized successfully.');
+    }
   });
 }
 
