@@ -8,6 +8,7 @@
     "start:server": "node --watch server/index.js",
     "dev": "npm start",
     "build": "ng build",
+    "build:render": "echo 'Backend dependencies ready'",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
     "server": "node server/index.js",
