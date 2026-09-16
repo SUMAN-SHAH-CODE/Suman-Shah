@@ -41,10 +41,11 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           ###### Repository/Build Configurations ######
-          app_location: "/" # App source code path
+          app_location: "dist/portfolio-app/browser" # Point directly to built files containing index.html
           api_location: "" # Api source code path - optional
-          output_location: "dist/portfolio-app/browser" # Built app content directory
-          skip_app_build: true # Pre-built with Node 22 in preceding step
+          output_location: "" # Output location is the app_location when pre-built
+          app_artifact_location: "dist/portfolio-app/browser"
+          skip_app_build: true # Skip Oryx build container
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
